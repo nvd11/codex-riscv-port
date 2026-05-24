@@ -156,3 +156,12 @@ sudo docker exec -e http_proxy=... -e https_proxy=... codex-builder sh -c "apt-g
 sudo docker exec -e http_proxy=... -e https_proxy=... codex-builder sh -c "curl --proto \"=https\" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
 ```
 **结果：** Rust 1.95.0 (`riscv64gc-unknown-linux-gnu`) 成功安装并就位。
+
+### 3.9 开始 Native 编译满血版 Codex (Target 环境内)
+在配置好所有的网络代理、依赖和 C 系统库之后，我们在容器内部发起终极的 Release 编译命令。由于是借助 QEMU 执行的 Native 编译，此过程不再涉及交叉编译工具链，因此可以完美规避系统库缺失的报错。
+**执行命令：**
+```bash
+sudo docker exec -e http_proxy=http://10.0.1.105:7890 -e https_proxy=http://10.0.1.105:7890 codex-builder bash -c "source \$HOME/.cargo/env && cd /workspace/codex-rs && cargo build --release"
+```
+**当前状态：**
+编译进程已在后台成功启动。Cargo 正在拉取依赖索引。由于 QEMU 用户态指令翻译存在巨大的性能折耗，特别是 V8 引擎（`rusty_v8`）的编译，预计耗时将非常漫长（可能需要数小时）。后台进程正受到持续监控。
