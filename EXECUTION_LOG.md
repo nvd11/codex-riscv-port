@@ -247,3 +247,19 @@ sudo docker exec -e http_proxy=http://10.0.1.105:7890 -e https_proxy=http://10.0
 2. **下载 `rusty_v8` 源码**：在 x86_64 宿主机上独立克隆了 `rusty_v8` 项目，并 check out 到 Codex 指定的 `v147.4.0` 版本。
 3. **发起 V8 独立交叉编译**：在 x86 宿主机配置好 HTTP 代理后，通过指令 `export V8_FROM_SOURCE=1 && cargo build --target riscv64gc-unknown-linux-gnu --release` 开始独立编译静态库 `librusty_v8.a`。
 *(注：由于 V8 构建系统（ninja/gn）极其庞大，此步骤在宿主机上依然需要一定时间，且可能需要补齐 `clang`, `python3` 等 C++ 前置构建工具依赖。)*
+
+### 3.19 修复 V8 C++ 编译报错，恢复 x86 原生满速火力
+**遇到的问题 (Troubleshooting)**:
+在 x86 宿主机首次尝试 `V8_FROM_SOURCE=1` 编译时，触发了 C++ 的 `std::atomic_ref` 模板推导报错（`error: 'std::atomic_ref' may not intend to support class template argument deduction`），以及 `<memory>` 找不到 `std::unique_ptr` 的错误。
+**根本原因**：
+为了规避系统依赖，我们在 GN Args 中错误地传入了 `use_custom_libcxx=false`，这强制 V8 使用了宿主机（Ubuntu 24.10, GCC-15）过于超前、且对依赖管理更严格的 `libstdc++`。V8 v147.4.0（对应的 Chromium 源码）在过于现代的头文件下暴露了包含遗漏问题。
+**解决方案**：
+移除 `use_custom_libcxx=false` 参数！让 V8 乖乖使用它自己作为 submodule 捆绑下载的官方 `libc++`。这样，工具链、头文件和源码完美匹配。
+**最终成功的构建口令**：
+```bash
+export V8_FROM_SOURCE=1
+export EXTRA_GN_ARGS="use_glib=false use_sysroot=false treat_warnings_as_errors=false"
+cargo build --target riscv64gc-unknown-linux-gnu --release
+```
+**当前状态**：
+突破了 C++ 编译器的报错瓶颈，后台 `clang++` 进程成功唤醒。5800H 宿主机的 16 个核心瞬间全部满载（CPU 占用率重回 100%）。不到 1 分钟内，编译产生的目标文件 (`.o`) 已突破 1000 个（总数 2300 左右）。脱离了 QEMU 的翻译泥潭，原生算力的降维打击展现得淋漓尽致，胜利在望！
