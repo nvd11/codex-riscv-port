@@ -105,3 +105,30 @@ sudo docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
 **下一步计划（Pending）：**
 需要为 Main PC 的 Docker Daemon 守护进程配置网络代理（指向 `10.0.1.105:7890`），以便成功拉取镜像并启动 RISC-V 容器环境。
+### 3.3 为 Docker 配置代理并重启
+**执行命令：**
+```bash
+sudo mkdir -p /etc/systemd/system/docker.service.d
+sudo sh -c 'echo -e "[Service]\nEnvironment=\"HTTP_PROXY=http://10.0.1.105:7890\"\nEnvironment=\"HTTPS_PROXY=http://10.0.1.105:7890\"\nEnvironment=\"NO_PROXY=localhost,127.0.0.1,10.0.1.0/24\"" > /etc/systemd/system/docker.service.d/http-proxy.conf'
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+```
+**结果：** 成功为 Docker Daemon 注入了代理环境变量。
+
+### 3.4 再次尝试注册 QEMU 翻译器（遇到内核网络栈特性缺失）
+**执行命令：**
+```bash
+sudo docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+```
+**遇到的问题（Troubleshooting）：**
+Docker 成功拉取到了镜像，但在启动容器时报错：
+`failed to add the host (veth) <=> sandbox pair interfaces: operation not supported`
+**根本原因：**
+精简编译的定制内核去掉了网桥（Bridge/veth）的支持，导致 Docker 的默认桥接网络模式无法工作。
+
+### 3.5 采用 Host 网络模式成功注册 QEMU
+**执行命令：**
+```bash
+sudo docker run --rm --privileged --network host multiarch/qemu-user-static --reset -p yes
+```
+**结果：** 成功绕过网桥限制，输出 `Setting /usr/bin/qemu-riscv64-static as binfmt interpreter for riscv64`，这意味着 Main PC 已经成功获得了运行 RISC-V 架构程序的能力。
