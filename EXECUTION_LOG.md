@@ -263,3 +263,19 @@ cargo build --target riscv64gc-unknown-linux-gnu --release
 ```
 **当前状态**：
 突破了 C++ 编译器的报错瓶颈，后台 `clang++` 进程成功唤醒。5800H 宿主机的 16 个核心瞬间全部满载（CPU 占用率重回 100%）。不到 1 分钟内，编译产生的目标文件 (`.o`) 已突破 1000 个（总数 2300 左右）。脱离了 QEMU 的翻译泥潭，原生算力的降维打击展现得淋漓尽致，胜利在望！
+
+### 3.20 突破 V8 C++ 编译后遭遇 Bindgen Clang 头文件风暴
+**遇到的问题 (Troubleshooting)**:
+在 V8 的数千个 C++ 源文件几乎全部编译完成（`ninja: no work to do.`）进入最后 Rust 绑定生成阶段时，构建脚本报错崩溃：
+```
+Warning: LIBCLANG_PATH not set. Bindgen requires Clang 19+.
+third_party/libc++/src/include/stddef.h:39:15: fatal error: 'stddef.h' file not found
+Unable to generate bindings: ClangDiagnostic("... 'stddef.h' file not found\n")
+```
+**根本原因**：
+`rusty_v8` 除了需要编译 V8 C++ 代码，还需要使用 Rust 的 `bindgen` 工具读取 C++ 头文件，动态生成 Rust 的接口调用代码（bindings）。
+由于我们开启了 `V8_FROM_SOURCE=1` 并在 x86_64 Ubuntu 24.10 宿主机上进行交叉编译，虽然 V8 本身的 C++ 代码被成功编译，但 `bindgen` 调用的宿主机 Clang 解析器找不到基础的 C 标准库头文件（如 `stddef.h`）。这是因为在脱离系统默认 Sysroot 且指定了极简交叉环境后，Clang 的标准头文件搜索路径断裂了。
+
+**应对策略探讨**：
+这条路已经踩到了交叉编译最深、最臭的泥潭。如果继续在 x86 宿主机上修补 Clang 头文件路径（需要繁琐地设定 `BINDGEN_EXTRA_CLANG_ARGS` 和 `LIBCLANG_PATH`，并且极易引入架构歧义），将耗费大量时间。
+鉴于此时距离成功只差最后一点 Bindings 生成，这恰恰证明了我们在 3.17 节提出的 Hybrid 策略在 C++ 阶段的正确性。
