@@ -132,3 +132,27 @@ Docker 成功拉取到了镜像，但在启动容器时报错：
 sudo docker run --rm --privileged --network host multiarch/qemu-user-static --reset -p yes
 ```
 **结果：** 成功绕过网桥限制，输出 `Setting /usr/bin/qemu-riscv64-static as binfmt interpreter for riscv64`，这意味着 Main PC 已经成功获得了运行 RISC-V 架构程序的能力。
+
+### 3.6 启动 RISC-V QEMU 容器
+**执行命令：**
+```bash
+sudo docker rm -f codex-builder 2>/dev/null
+sudo docker run -d --name codex-builder --platform linux/riscv64 --network host -v /home/gateman/projects/codex-riscv-port/codex:/workspace debian:13 tail -f /dev/null
+```
+**结果：** 成功启动。`docker exec codex-builder uname -m` 验证返回 `riscv64`。
+
+### 3.7 安装系统编译依赖 (Target 环境内)
+进入容器，安装编译 V8 及底层库必须的原生 C/C++ 工具链。
+**执行命令：**
+```bash
+sudo docker exec -e http_proxy=... -e https_proxy=... codex-builder sh -c "apt-get update && apt-get install -y build-essential pkg-config libglib2.0-dev libssl-dev ninja-build python3 curl"
+```
+**结果：** `dpkg` 经过漫长的 QEMU 翻译解压，成功安装完毕。
+
+### 3.8 安装 Target 原生 Rust 工具链
+在容器内为 RISC-V 安装原生的 Rust 编译器（不再是宿主机的交叉编译链）。
+**执行命令：**
+```bash
+sudo docker exec -e http_proxy=... -e https_proxy=... codex-builder sh -c "curl --proto \"=https\" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+```
+**结果：** Rust 1.95.0 (`riscv64gc-unknown-linux-gnu`) 成功安装并就位。
