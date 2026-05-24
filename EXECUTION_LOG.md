@@ -240,3 +240,10 @@ sudo docker exec -e http_proxy=http://10.0.1.105:7890 -e https_proxy=http://10.0
    `cargo build --release`
    
 **结论**：此方案完美避开了 x86 交叉编译的系统库缺失风暴，同时又剥离了 QEMU 最致命的 V8 编译耗时，堪称教科书级别的工程解法！
+
+### 3.18 执行 Hybrid 模式：中止 QEMU 编译并回退 x86 交叉编译 V8
+遵循我们在 3.17 节中敲定的最终战术：
+1. **中断 QEMU 容器**：使用 `docker stop codex-builder` 中断了运行在 QEMU 内正在饱受性能煎熬的 Cargo 全量编译进程。
+2. **下载 `rusty_v8` 源码**：在 x86_64 宿主机上独立克隆了 `rusty_v8` 项目，并 check out 到 Codex 指定的 `v147.4.0` 版本。
+3. **发起 V8 独立交叉编译**：在 x86 宿主机配置好 HTTP 代理后，通过指令 `export V8_FROM_SOURCE=1 && cargo build --target riscv64gc-unknown-linux-gnu --release` 开始独立编译静态库 `librusty_v8.a`。
+*(注：由于 V8 构建系统（ninja/gn）极其庞大，此步骤在宿主机上依然需要一定时间，且可能需要补齐 `clang`, `python3` 等 C++ 前置构建工具依赖。)*
