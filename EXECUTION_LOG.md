@@ -204,3 +204,11 @@ sudo docker exec -e http_proxy=http://10.0.1.105:7890 -e https_proxy=http://10.0
 2. **结构化数据处理能力的灾难 (Structured Data Manipulation)**：Bash 擅长按行处理纯文本，但在面对现代工程中最核心的 **JSON, YAML, TOML 甚至 AST（抽象语法树）**时，Bash 的原生处理能力近乎为零（必须依赖外部工具如 `jq`，而用户机器上未必安装了 `jq`）。相比之下，JavaScript 原生自带 `JSON.parse`，对复杂嵌套数据的提取和聚合具有降维打击般的优势。
 3. **安全逃逸控制与沙盒管控 (Sandboxing & Jailbreak Prevention)**：如果允许大模型使用 Bash，相当于直接给其开了一个通向底层操作系统的后门。Bash 可以轻易调用系统中任意危险的二进制文件（如 `curl` 下载恶意木马，`rm` 删除数据）。尽管可以对 Bash 命令进行字符串匹配过滤，但在 Bash 极度灵活的语法（混淆、拼接、反撇号、管道、重定向）面前，安全拦截器形同虚设，极易被“越狱”。而运行在 V8 引擎中的 JS 代码，其宿主（Rust 本体）可以实施 **"Default Deny"** 策略：除了显式注入的接口（如受限的 `readFile`），JS 代码即使想调用外部二进制也绝对做不到。
 4. **状态隔离与副作用清理 (State Mutation & Side Effects)**：Bash 脚本在运行过程中可能会修改环境变量、残留临时文件、或者在后台遗留悬挂进程（Zombie Process）。而 V8 Engine 每次执行大模型代码时都可以分配一个全新的、干净的 `Isolate` 沙盒实例，执行完毕后内存即刻销毁，没有任何副作用残留，保证了极度的纯净和幂等性。
+
+### 3.15 架构深度辨析：为何 Agent 内嵌 V8 (JavaScript) 而非 Python 作为动态执行引擎？
+**质疑点**：Python 同样是解释型脚本语言，跨平台，处理 JSON 和文本能力极强，且大模型本身最擅长编写 Python 代码。为何 Codex 不选择嵌入 Python？
+**核心原因剖析：**
+1. **终极沙盒与安全性 (The Ultimate Sandbox)**：这是最致命的区别。V8 引擎（JavaScript）从诞生之初（为 Chrome 浏览器服务）就是为了**“安全执行全网互不信任的恶意代码”**而设计的。通过 V8 的 `Isolate` 机制，Rust 宿主可以在几毫秒内拉起一个极度受限的内存黑盒，精确控制内存上限、CPU 运行超时，并且默认切断一切系统级 API。而 CPython **根本没有原生的安全沙盒**。Python 中的隔离极其脆弱，大模型生成的 Python 代码很容易通过 `ctypes`、`os.system` 等底层模块击穿所谓的限制。要安全执行 Python，通常需要拉起 OS 级别的 Docker 容器或 Firecracker，这带来了极大的资源消耗和启动延迟。
+2. **“单文件可执行”的部署极致 (Single Binary Deployment)**：Agent 工具（如 Codex）追求极致的安装体验：下载一个可执行文件直接运行。Rust 与 `rusty_v8` 结合，可以将整个 V8 引擎静态链接进最终的二进制文件内，无需依赖外界环境。而 CPython 的嵌入极其痛苦：它不仅需要 C 运行库，还需要庞大且碎片的 Python 标准库（数十兆的 `.py` 文件）。如果依赖用户机器上的宿主 Python，则会立刻陷入“Python 版本地狱（3.8 vs 3.12）”和环境变量冲突中。
+3. **毫秒级状态销毁与并发 (Stateless & Concurrency)**：由于 `v8::Isolate` 的轻量级特性，Codex 甚至可以为大模型的每一步思考瞬间开辟多个并行的 JS 沙盒，互不干扰，用完即毁。而 CPython 存在全局解释器锁（GIL），且在单一进程内反复重置解释器状态极易发生内存泄漏或状态污染。
+4. **JIT 性能碾压 (Performance)**：V8 引擎自带极其强悍的即时编译器 (JIT)。在执行大量的字符串拼接、正则匹配、AST 遍历等 Agent 常见任务时，V8 的执行速度通常是传统 CPython 字节码解释器的数倍甚至数十倍。
