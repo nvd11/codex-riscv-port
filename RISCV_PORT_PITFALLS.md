@@ -30,3 +30,6 @@
 
 9. **Missing liblzma & openssl for RISC-V Cross-Compilation**: Linker (riscv64-linux-gnu-gcc) fails with cannot find -llzma / -lssl: No such file or directory. The linker skips the incompatible x86_64-linux-gnu versions.
    **Fix**: Install the target architecture packages: sudo apt-get install -y liblzma-dev:riscv64 libssl-dev:riscv64, and export PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/riscv64-linux-gnu/pkgconfig.
+
+10. **Cargo Zombie Processes Locking build.rs**: During long compilations, if a previous build is aborted or crashes, zombie Cargo/rustc processes can hold file locks (like `build.rs` or `v8.fslock`). This blocks subsequent builds indefinitely during the linking or build script phase.
+    **Fix**: Identify and kill the leftover cargo/rustc processes (`ps aux | grep cargo` / `kill -9 <PID>`) to release the locks, allowing the cached build to proceed straight to linking.
