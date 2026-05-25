@@ -41,3 +41,11 @@ is only available from another source resolves the missing headers for the host 
 ## 7. libc++ Cross-Compilation Wordsize Error
 **Issue**: Clang internal builder (clang++) fails with fatal error: 'bits/wordsize.h' file not found while compiling alloc_error_handler_impl.cc for x86_64-unknown-linux-gnu (host toolchain).
 **Solution**: This is a known issue on multiarch systems where the 32-bit (i386) libc dev headers are missing. Running sudo apt-get install -y gcc-multilib g++-multilib libc6-dev-i386 resolves the missing headers for the host tools build.
+
+## 8. V8 Architecture Hardcoding (x64)
+**Issue**: While generating Rust bindings with bindgen, V8 header  throws . The  configured V8 for x64 despite  targeting RISC-V.
+**Solution**: V8's build system needs explicit target CPU arguments when cross-compiling. Setting  ensures GN configures V8 correctly.
+
+## 8. V8 Architecture Hardcoding (x64)
+**Issue**: While generating Rust bindings with bindgen, V8 header v8config.h throws error: Target architecture x64 is only supported on x64 and arm64 host. The gn gen configured V8 for x64 despite cargo targeting RISC-V.
+**Solution**: V8's build system needs explicit target CPU arguments when cross-compiling. Setting V8_TARGET_CPU=riscv64 ensures GN configures V8 correctly.
