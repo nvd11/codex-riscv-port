@@ -57,3 +57,11 @@ is only available from another source resolves the missing headers for the host 
 ## 9. GN Arguments Missing RISC-V Cross-Compilation
 **Issue**: rusty_v8's build.rs natively adds target_cpu and v8_target_cpu for ARM and AArch64 when cross compiling, but fails to do so for RISC-V, allowing GN to fall back to the host architecture (x64) and triggering the bindgen error.
 **Solution**: Pass the correct CPU parameters to GN using EXTRA_GN_ARGS="target_cpu=\"riscv64\" v8_target_cpu=\"riscv64\"".
+
+## 10. Missing liblzma for RISC-V Cross-Compilation
+**Issue**: Linker () fails with  when compiling  and . The linker skips the incompatible .
+**Solution**: Install the  package so the linker has the correct target architecture libraries available.
+
+## 10. Missing liblzma for RISC-V Cross-Compilation
+**Issue**: Linker (riscv64-linux-gnu-gcc) fails with cannot find -llzma: No such file or directory when compiling codex-thread-manager-sample and codex-app-server-test-client. The linker skips the incompatible x86_64-linux-gnu/liblzma.so.
+**Solution**: Install the liblzma-dev:riscv64 package so the linker has the correct target architecture libraries available.
