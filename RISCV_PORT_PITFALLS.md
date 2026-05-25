@@ -28,3 +28,16 @@ Reading state information....
 2. Add a new ubuntu-ports.sources specifically for Architectures: riscv64 pointing to http://ports.ubuntu.com/ubuntu-ports/.
 3. Run sudo dpkg --add-architecture riscv64.
 4. Install the required target development headers: sudo apt-get install -y libcap-dev:riscv64 libglib2.0-dev:riscv64.
+
+## 7. libc++ Cross-Compilation Wordsize Error
+**Issue**: Clang internal builder () fails with  while compiling  for  (host toolchain).
+**Solution**: This is a known issue on multiarch systems where the 32-bit (i386) libc dev headers are missing. Running Reading package lists...
+Building dependency tree...
+Reading state information...
+Package gcc-multilib is not available, but is referred to by another package.
+This may mean that the package is missing, has been obsoleted, or
+is only available from another source resolves the missing headers for the host tools build.
+
+## 7. libc++ Cross-Compilation Wordsize Error
+**Issue**: Clang internal builder (clang++) fails with fatal error: 'bits/wordsize.h' file not found while compiling alloc_error_handler_impl.cc for x86_64-unknown-linux-gnu (host toolchain).
+**Solution**: This is a known issue on multiarch systems where the 32-bit (i386) libc dev headers are missing. Running sudo apt-get install -y gcc-multilib g++-multilib libc6-dev-i386 resolves the missing headers for the host tools build.
