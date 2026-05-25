@@ -279,3 +279,21 @@ Unable to generate bindings: ClangDiagnostic("... 'stddef.h' file not found\n")
 **应对策略探讨**：
 这条路已经踩到了交叉编译最深、最臭的泥潭。如果继续在 x86 宿主机上修补 Clang 头文件路径（需要繁琐地设定 `BINDGEN_EXTRA_CLANG_ARGS` 和 `LIBCLANG_PATH`，并且极易引入架构歧义），将耗费大量时间。
 鉴于此时距离成功只差最后一点 Bindings 生成，这恰恰证明了我们在 3.17 节提出的 Hybrid 策略在 C++ 阶段的正确性。
+
+### 3.21 最终的救赎：V8 Target Architecture 与 Bindgen 头文件修复
+**遇到的问题 (Troubleshooting)**:
+在上一节（3.20）中，`bindgen` 遇到了 `stddef.h not found` 且随后报出了 `Target architecture x64 is only supported on x64 and arm64 host`。
+**深入排查原因**：
+通过拦截构建脚本调用 `get_bindgen_args.py` 的过程，发现在 `EXTRA_GN_ARGS` 中没有显式传递 `target_cpu="riscv64"`，导致 GN 构建系统默认 fallback 到了宿主机架构（x86_64）。因此，之前看似极速的 C++ 编译，实际上编译的是 x86 版本的 V8！而 `v8config.h` 强校验了架构匹配，这反而救了我们一命，防止我们拿着 x86 的静态库去喂给 QEMU 里的 RISC-V 链接器。
+
+**最终终极修复方案**：
+1. **注入正确的交叉架构到 GN**：
+   `export EXTRA_GN_ARGS="target_cpu=\"riscv64\" v8_target_cpu=\"riscv64\" use_glib=false use_sysroot=false treat_warnings_as_errors=false"`
+2. **修复 Bindgen 头文件断裂 (Clang Arguments 修正)**：
+   不能全局设置 `BINDGEN_EXTRA_CLANG_ARGS`（会污染 GN 自身的交叉主机工具链编译），而是直接通过修改 `build.rs` 源码（Sed 注入），在最终调用 `bindgen::Builder` 时手动追加：
+   `--target=riscv64-linux-gnu`
+   `-I/usr/lib/llvm-21/lib/clang/21/include`
+   `-I/usr/riscv64-linux-gnu/include`
+
+**当前状态**：
+执行修正后的命令，GN 成功识别到架构变更并触发了真正的 `riscv64` V8 交叉编译。宿主机 5800H 的 16 个线程重回 100% 满负荷运转！我们现在正行驶在正确的交叉编译轨道上。
