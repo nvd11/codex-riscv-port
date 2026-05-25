@@ -2,3 +2,29 @@
 1. Prebuilt V8 Missing: codex-rs panics because no RISC-V v8 binaries exist. Fix: export V8_FROM_SOURCE=1
 2. v8.fslock Permission: root ran it previously. Fix: sudo rm target/release/build/v8.fslock
 3. Chrome Infra Network Block: ninja/gn download fails due to appspot.com block.
+
+## 5. gn gen File Ownership Error
+**Issue**:  fails with  on  in .
+**Solution**: A previous test run as  created the  directory. Running  resolves it.
+
+## 6. codex-bwrap pkg-config Missing RISC-V Libraries
+**Issue**:  fails to compile because  cannot find  and  for the RISC-V target. The system only has them for .
+**Solution**: 
+1. Separate  architectures by setting  for the main repositories.
+2. Add a new  specifically for  pointing to .
+3. Run .
+4. Install the required target development headers: Reading package lists...
+Building dependency tree...
+Reading state information....
+
+## 5. gn gen File Ownership Error
+**Issue**: gn gen fails with Permission denied (13) on mobileprovisions.filelist in target/release/gn_out.
+**Solution**: A previous test run as root created the gn_out directory. Running sudo chown -R gateman:gateman target/release/gn_out resolves it.
+
+## 6. codex-bwrap pkg-config Missing RISC-V Libraries
+**Issue**: codex-bwrap fails to compile because pkg-config cannot find libcap and glib-2.0 for the RISC-V target. The system only has them for amd64.
+**Solution**: 
+1. Separate ubuntu.sources architectures by setting Architectures: amd64 i386 for the main repositories.
+2. Add a new ubuntu-ports.sources specifically for Architectures: riscv64 pointing to http://ports.ubuntu.com/ubuntu-ports/.
+3. Run sudo dpkg --add-architecture riscv64.
+4. Install the required target development headers: sudo apt-get install -y libcap-dev:riscv64 libglib2.0-dev:riscv64.
