@@ -49,3 +49,11 @@ is only available from another source resolves the missing headers for the host 
 ## 8. V8 Architecture Hardcoding (x64)
 **Issue**: While generating Rust bindings with bindgen, V8 header v8config.h throws error: Target architecture x64 is only supported on x64 and arm64 host. The gn gen configured V8 for x64 despite cargo targeting RISC-V.
 **Solution**: V8's build system needs explicit target CPU arguments when cross-compiling. Setting V8_TARGET_CPU=riscv64 ensures GN configures V8 correctly.
+
+## 9. GN Arguments Missing RISC-V Cross-Compilation
+**Issue**: 's  natively adds  and  for ARM and AArch64 when cross compiling, but fails to do so for RISC-V, allowing GN to fall back to the host architecture (x64) and triggering the bindgen error.
+**Solution**: Pass the correct CPU parameters to GN using .
+
+## 9. GN Arguments Missing RISC-V Cross-Compilation
+**Issue**: rusty_v8's build.rs natively adds target_cpu and v8_target_cpu for ARM and AArch64 when cross compiling, but fails to do so for RISC-V, allowing GN to fall back to the host architecture (x64) and triggering the bindgen error.
+**Solution**: Pass the correct CPU parameters to GN using EXTRA_GN_ARGS="target_cpu=\"riscv64\" v8_target_cpu=\"riscv64\"".
