@@ -26,10 +26,10 @@
    **Fix**: V8's build system needs explicit target CPU arguments when cross-compiling. Setting V8_TARGET_CPU=riscv64 ensures GN configures V8 correctly.
 
 8. **GN Arguments Missing RISC-V Cross-Compilation**: rusty_v8's build.rs natively adds target_cpu and v8_target_cpu for ARM and AArch64 when cross compiling, but fails to do so for RISC-V, allowing GN to fall back to the host architecture (x64) and triggering the bindgen error.
-   **Fix**: Pass the correct CPU parameters to GN using EXTRA_GN_ARGS=target_cpu="riscv64" v8_target_cpu="riscv64".
+   **Fix**: Pass the correct CPU parameters to GN using EXTRA_GN_ARGS="target_cpu=\"riscv64\" v8_target_cpu=\"riscv64\"".
 
-9. **Missing liblzma & openssl for RISC-V Cross-Compilation**: Linker (riscv64-linux-gnu-gcc) fails with cannot find -llzma / -lssl: No such file or directory. The linker skips the incompatible x86_64-linux-gnu versions.
-   **Fix**: Install the target architecture packages: sudo apt-get install -y liblzma-dev:riscv64 libssl-dev:riscv64, and export PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/riscv64-linux-gnu/pkgconfig.
+9. **Missing openssl for RISC-V Cross-Compilation**: Linker (riscv64-linux-gnu-gcc) fails with cannot find -lssl / -lcrypto: No such file or directory.
+   **Fix**: Install the target architecture packages: sudo apt-get install -y libssl-dev:riscv64, and export PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/riscv64-linux-gnu/pkgconfig.
 
-10. **Cargo Zombie Processes Locking build.rs**: During long compilations, if a previous build is aborted or crashes, zombie Cargo/rustc processes can hold file locks (like `build.rs` or `v8.fslock`). This blocks subsequent builds indefinitely during the linking or build script phase.
-    **Fix**: Identify and kill the leftover cargo/rustc processes (`ps aux | grep cargo` / `kill -9 <PID>`) to release the locks, allowing the cached build to proceed straight to linking.
+10. **Missing liblzma for RISC-V Cross-Compilation**: Linker (riscv64-linux-gnu-gcc) fails with cannot find -llzma: No such file or directory. The linker skips the incompatible x86_64-linux-gnu versions.
+    **Fix**: Install the target architecture packages: sudo apt-get install -y liblzma-dev:riscv64.
