@@ -297,3 +297,27 @@ Unable to generate bindings: ClangDiagnostic("... 'stddef.h' file not found\n")
 
 **当前状态**：
 执行修正后的命令，GN 成功识别到架构变更并触发了真正的 `riscv64` V8 交叉编译。宿主机 5800H 的 16 个线程重回 100% 满负荷运转！我们现在正行驶在正确的交叉编译轨道上。
+
+### 3.22 C/C++ 标准库头文件终极补全与 Codex 引擎级联调
+**遇到的问题 (Troubleshooting)**:
+V8 交叉编译成功后，在执行顶层 Codex 的 Cargo 构建（或者其它组件的 `build.rs`）时，依然会遇到零星的跨架构头文件缺失问题（如 `<gnu/stubs-ilp32d.h>` 找不到、`<bits/wordsize.h>` 报错）。这是由于 Ubuntu 系统的多架构（Multiarch）环境在配置 RISC-V 交叉头文件时，`gcc-riscv64-linux-gnu` 并不能自动包含所有深层的 glibc 架构特定存根（stubs）。
+
+**修复方案**：
+1. **注入 glibc 标准库（Docker Rootfs 提取）**：不再依赖有缺陷的交叉包，而是启动了一个原生的 `riscv64` 架构的 Debian 容器，将其原生的 `/usr/include/riscv64-linux-gnu/bits/wordsize.h` 强行拉取出来，覆盖宿主机中发生冲突的头文件。
+2. **Cargo 工作区连编**：我们在 Codex 项目根目录执行了全局级的 `cargo build -p codex-v8-poc --target riscv64gc-unknown-linux-gnu --tests`，成功使用刚才编译出来的 `librusty_v8.a` 对外围的测试代码进行了无缝链接。生成了可执行文件 `codex_v8_poc`。
+
+**星光板 (Starfive) 真机验证结果**：
+通过 `scp` 将编译出的 `codex_v8_poc` 二进制文件推送到本地的 RISC-V 真机星光板（IP: `10.0.1.227`）执行：
+```
+running 6 tests
+test tests::exposes_embedded_v8_version ... ok
+test tests::exposes_expected_bazel_target ... ok
+test tests::sandbox_feature_matches_linked_v8 ... ok
+test tests::parses_crdtp_dispatchable_messages ... ok
+test tests::evaluates_integer_addition ... ok
+test tests::evaluates_string_concatenation ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.90s
+```
+**结论**：
+内置了全新 V8 引擎（147.4.0 版本）的 Codex 基础外壳已经在真实的 RISC-V 硬件上成功运行！JavaScript 执行、字符串拼接、整数计算等核心 V8 C++ API 全部表现正常。
